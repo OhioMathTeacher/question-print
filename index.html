@@ -125,6 +125,9 @@ table.t3 .tag.diff{color:var(--warn)}
   <p class="muted small" style="margin:12px 0 6px">or</p>
   <div class="drop" id="drop">drop an audio file here, or click (m4a, mp3, wav, webm, ogg)</div>
   <input type="file" id="file" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg" hidden>
+  <p class="muted small" style="margin:12px 0 6px">or, for a conversation that was typed rather than spoken</p>
+  <div class="drop" id="dropJson">drop a session file here (a <b>Verbatim</b> export, or a Question Print file you saved)</div>
+  <input type="file" id="fileJson" accept=".json,application/json" hidden>
   <div id="audioInfo" class="hidden" style="margin-top:14px">
     <div class="row"><b id="audioName"></b><span class="muted small" id="audioLen"></span><audio id="player" controls style="height:32px"></audio></div>
     <div class="wave" id="wave"></div>
@@ -144,7 +147,7 @@ table.t3 .tag.diff{color:var(--warn)}
 <!-- 3 speakers -->
 <section id="s3" class="card hidden">
   <h2 style="margin-top:0">3 · Who spoke, and which lines are questions</h2>
-  <p class="muted small">Tap <b>T</b> on the lines that are yours (the teacher's) and <b>S</b> on the student's. Fix any words the transcriber got wrong by clicking into the text. Lines ending in a question mark are marked as questions; toggle any the transcriber missed or over-marked. Only the teacher's questions get tagged.</p>
+  <p class="muted small">Tap <b>T</b> on the lines that are the questioner's (you, the teacher; or the AI, in a typed session) and <b>S</b> on the student's. Fix any words the transcriber got wrong by clicking into the text. Lines ending in a question mark are marked as questions; toggle any the transcriber missed or over-marked. Only the teacher's questions get tagged.</p>
   <div class="row noprint" style="margin-bottom:8px">
     <button id="allT" class="quiet">All lines → T</button><button id="qLinesT" class="quiet">Lines with ? → T, the rest → S</button>
     <span class="muted small" id="qcount"></span>
@@ -278,6 +281,31 @@ $("#drop").ondragover = e => { e.preventDefault(); $("#drop").classList.add("ove
 $("#drop").ondragleave = () => $("#drop").classList.remove("over");
 $("#drop").ondrop = e => { e.preventDefault(); $("#drop").classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) loadAudio(f); };
 
+// a typed conversation: Verbatim's session JSON (turns tagged student / ai at creation) needs no transcribing and no
+// speaker guessing. The AI is the questioner here, so its turns are T; the student's are S. A Question Print JSON restores.
+$("#dropJson").onclick = () => $("#fileJson").click();
+$("#fileJson").onchange = e => e.target.files[0] && loadJson(e.target.files[0]);
+$("#dropJson").ondragover = e => { e.preventDefault(); $("#dropJson").classList.add("over"); };
+$("#dropJson").ondragleave = () => $("#dropJson").classList.remove("over");
+$("#dropJson").ondrop = e => { e.preventDefault(); $("#dropJson").classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) loadJson(f); };
+async function loadJson(file) {
+  let j; try { j = JSON.parse(await file.text()); } catch { toast("That isn't a JSON file."); return; }
+  if (j.app === "question-print" && j.lines) { P = { name: j.name || file.name, duration: j.duration || 0, lines: j.lines, model: j.model || "", source: j.source }; save(); renderLines(); step(3); toast("Restored " + P.name); return; }
+  const turns = j.turns || j.conversation; if (!Array.isArray(turns)) { toast("No turns in that file. Verbatim exports and Question Print files work."); return; }
+  const lines = []; let at = 0;
+  for (const t of turns) {
+    const text = (t.text || "").trim(); if (!text) continue;   // a deleted turn keeps its place and loses its words
+    const who = t.role === "ai" || t.role === "assistant" || t.role === "T" ? "T" : "S";
+    const t0 = t.ts ? (Date.parse(t.ts) - Date.parse(turns[0].ts || t.ts)) / 1000 : at;
+    // sentences, so a question can stand alone; keep list items and code as one line each
+    const parts = text.split(/\n+/).flatMap(par => par.match(/[^.?!]+[.?!]+["')\]]?|[^.?!]+$/g) || [par]);
+    for (const p of parts) { const q = p.trim(); if (!q) continue; lines.push({ t0, t1: t0, text: q, who, q: who === "T" && /\?\s*$/.test(q) && q.length < 400, dok: 0, bloom: 0, ai: null, turn: t.i }); }
+    at = t0 + 1;
+  }
+  P = { name: file.name, duration: lines.length ? lines[lines.length - 1].t0 : 0, lines, model: "", source: { schema: j.schema, participant: j.participant, group: j.group, section: j.section, provider: j.provider, model: j.model } };
+  save(); renderLines(); step(3); toast(`${turns.length} turns, ${lines.filter(l => l.q).length} questions by the AI`);
+}
+
 // in-app recording
 let rec = null, chunks = [];
 $("#recBtn").onclick = async () => {
@@ -345,7 +373,7 @@ function renderLines() {
   const box = $("#lines"); box.textContent = "";
   P.lines.forEach((l, i) => {
     const d = document.createElement("div"); d.className = "line " + l.who + (l.q ? " q" : ""); d.dataset.i = i;
-    const t = document.createElement("div"); t.className = "t"; t.textContent = fmt(l.t0);
+    const t = document.createElement("div"); t.className = "t"; t.textContent = P.source ? (l.turn != null ? "#" + l.turn : "") : fmt(l.t0);
     const who = document.createElement("div"); who.className = "who";
     for (const w of ["T", "S"]) { const b = document.createElement("b"); b.className = w; b.textContent = w; b.title = w === "T" ? "the teacher (you)" : "the student"; b.onclick = () => { l.who = w; d.className = "line " + l.who + (l.q ? " q" : ""); save(); }; who.appendChild(b); }
     const txt = document.createElement("div"); txt.className = "txt"; txt.contentEditable = "true"; txt.spellcheck = false; txt.textContent = l.text;
@@ -404,7 +432,7 @@ function refresh(c, l) {
 // the machine's turn: a prompt, sent with the student's own key (Journaler's pattern) or carried over by hand
 const MATRIX_TEXT = () => Object.entries(CRM).map(([b, row]) => `Bloom ${b} (${BLOOM[b - 1]}): ` + row.map((t, d) => `DOK ${d + 1}: ${t || "(no such combination)"}`).join(" | ")).join("\n");
 const FRAME = () => `I am a pre-service mathematics teacher learning Hess's Cognitive Rigor Matrix: Webb's Depth of Knowledge (DOK 1 recall and reproduction; DOK 2 basic skills and concepts; DOK 3 strategic thinking and reasoning; DOK 4 extended thinking) crossed with revised Bloom's (1 Remember, 2 Understand, 3 Apply, 4 Analyze, 5 Evaluate, 6 Create). Judge by what the student would actually have to do to answer, not by the verb. Five combinations do not exist: Remember at DOK 2, 3, or 4, and Evaluate at DOK 1 or 2.\n\nThe matrix cells:\n${MATRIX_TEXT()}\n`;
-const tagPrompt = qs => FRAME() + `\nBelow are questions I asked a student during ${fmt(P.duration)} of mathematics talk. Tag each one.\nReply with exactly one line per question, in this form and nothing else:\nQ1: DOK 2, Bloom 3 — one short reason\n\nThe questions:\n` + qs.map(({ l }, n) => `Q${n + 1}: ${l.text}`).join("\n");
+const tagPrompt = qs => FRAME() + `\nBelow are questions ${P.source ? "an AI tutor asked a student in a typed calculus session" : "I asked a student during " + fmt(P.duration) + " of mathematics talk"}. Tag each one.\nReply with exactly one line per question, in this form and nothing else:\nQ1: DOK 2, Bloom 3 — one short reason\n\nThe questions:\n` + qs.map(({ l }, n) => `Q${n + 1}: ${l.text}`).join("\n");
 function upTarget(l) {   // the next existing cell up the DOK axis in the same Bloom row, else one Bloom row up at the same DOK
   const b = l.bloom || 2, d = l.dok || 1;
   for (let dd = d + 1; dd <= 4; dd++) if (cellText(b, dd)) return { b, d: dd };
@@ -470,7 +498,7 @@ function renderSee() {
   const mean = tagged.length ? (tagged.reduce((a, { l }) => a + l.dok, 0) / tagged.length).toFixed(1) : "–";
   const d1 = tagged.filter(({ l }) => l.dok === 1).length;
   const agree = qs.filter(({ l }) => l.ai && l.dok && l.bloom && l.ai.dok === l.dok && l.ai.bloom === l.bloom).length, aiN = qs.filter(({ l }) => l.ai).length;
-  $("#stats").innerHTML = `<span class="stat"><b>${qs.length}</b> questions in ${fmt(P.duration)}</span><span class="stat"><b>${mean}</b> mean DOK</span><span class="stat"><b>${tagged.length ? Math.round(100 * d1 / tagged.length) : 0}%</b> at DOK 1</span>` + (aiN ? `<span class="stat"><b>${agree}/${aiN}</b> where you and the machine agree</span>` : "");
+  $("#stats").innerHTML = `<span class="stat"><b>${qs.length}</b> questions${P.source ? " in " + (P.lines.reduce((m, l) => Math.max(m, l.turn ?? 0), 0) + 1) + " turns" : " in " + fmt(P.duration)}</span><span class="stat"><b>${mean}</b> mean DOK</span><span class="stat"><b>${tagged.length ? Math.round(100 * d1 / tagged.length) : 0}%</b> at DOK 1</span>` + (aiN ? `<span class="stat"><b>${agree}/${aiN}</b> where you and the machine agree</span>` : "");
   const strip = $("#strip"); strip.textContent = "";
   qs.forEach(({ l }, n) => { const i = document.createElement("i"); i.className = "d" + (l.dok || 0); i.title = `Q${n + 1} · DOK ${l.dok || "?"}, Bloom ${l.bloom || "?"} · ${l.text}`; strip.appendChild(i); });
   // the matrix
@@ -498,7 +526,7 @@ function renderSee() {
 }
 const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 $("#printBtn").onclick = () => window.print();
-$("#jsonBtn").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ app: "question-print", name: P.name, duration: P.duration, model: P.model, lines: P.lines }, null, 1)], { type: "application/json" })); a.download = (P.name.replace(/\.[^.]+$/, "") || "question-print") + ".json"; a.click(); };
+$("#jsonBtn").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ app: "question-print", name: P.name, duration: P.duration, model: P.model, source: P.source || null, lines: P.lines }, null, 1)], { type: "application/json" })); a.download = (P.name.replace(/\.[^.]+$/, "") || "question-print") + ".json"; a.click(); };
 $("#txtBtn").onclick = async () => { const txt = P.lines.map(l => `${l.who || " "}: ${l.text}` + (l.q && l.who === "T" && l.dok && l.bloom ? ` [DOK-${l.dok}, Bloom ${l.bloom}]` : "")).join("\n"); try { await navigator.clipboard.writeText(txt); toast("Transcript copied."); } catch { toast("Couldn't copy."); } };
 $("#reset").onclick = () => { if (confirm("Start over? The transcript and tags on this page are cleared. (No recording is stored.)")) { localStorage.removeItem("qp"); location.reload(); } };
 document.querySelectorAll("#steps span").forEach(s => s.onclick = () => { const k = +s.dataset.s; if (k === 1 || (k >= 3 && P.lines.length)) { if (k === 4) renderCards(); if (k === 5) renderSee(); step(k); } });

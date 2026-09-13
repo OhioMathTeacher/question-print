@@ -31,6 +31,19 @@ The transcript and the tags are what you keep, as a PDF and a JSON.
 Work in progress is kept in the browser (localStorage), so a closed tab
 doesn't lose the tags. "Start over" clears it.
 
+## A typed conversation instead of a recording
+
+Drop a **Verbatim** session export (`tea-taylor-session/*`) on the second
+drop zone and the app skips recording and transcribing: every turn is
+already tagged `student` or `ai`, so the AI's questions go straight to
+tagging. The same matrix, strip, and Table 3 come out, for the machine's
+questioning instead of a teacher's. A Question Print JSON you saved earlier
+drops in the same way and restores.
+
+`tools/tag-sessions.py SESSIONS OUT` tags a whole folder offline with
+`claude -p`, writing one droppable file per session and a `summary.md`
+across the corpus (DOK shares, the matrix, per-session means and drift).
+
 ## For TCE 318P
 
 An option for the Week 6 Concept Profile: one of the two or three pieces of
