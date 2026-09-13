@@ -52,12 +52,15 @@ def prompt_for(qs):
              "DOK 2 basic skills and concepts; DOK 3 strategic thinking and reasoning; DOK 4 extended thinking) crossed with revised Bloom's "
              "(1 Remember, 2 Understand, 3 Apply, 4 Analyze, 5 Evaluate, 6 Create). Judge by what the student would actually have to do to answer, "
              "not by the verb. Five combinations do not exist: Remember at DOK 2, 3, or 4, and Evaluate at DOK 1 or 2.\n\nThe matrix cells:\n" + matrix_text() + "\n")
-    return frame + ("\nBelow are questions an AI tutor asked a student in a typed calculus session. Tag each one.\n"
-                    "Reply with exactly one line per question, in this form and nothing else:\nQ1: DOK 2, Bloom 3 — one short reason\n\nThe questions:\n"
+    return frame + ("\nBelow are questions an AI tutor asked a student in a typed calculus session. Some are about the mathematics "
+                    "(Taylor series, approximation); some are setup: the tutor asking about the student's preferences, feelings, or how to run "
+                    "the session. Tag each one, and say which kind it is.\n"
+                    "Reply with exactly one line per question, in this form and nothing else:\nQ1: DOK 2, Bloom 3, math — one short reason\n"
+                    "(the fourth field is  math  or  setup)\n\nThe questions:\n"
                     + "\n".join(f"Q{n+1}: {l['text']}" for n, l in enumerate(qs)))
 
 
-TAG = re.compile(r"Q\s*(\d+)\s*[:.)-]\s*DOK[\s-]*(\d)\s*[,;]?\s*Bloom(?:'s)?[\s-]*(\d)\s*(?:[—–:-]\s*(.*))?", re.I)
+TAG = re.compile(r"Q\s*(\d+)\s*[:.)-]\s*DOK[\s-]*(\d)\s*[,;]?\s*Bloom(?:'s)?[\s-]*(\d)\s*[,;]?\s*(math|setup)?\s*(?:[—–:-]\s*(.*))?", re.I)
 
 
 def tag(qs, model):
@@ -70,7 +73,7 @@ def tag(qs, model):
         if 0 <= i < len(qs):
             d, b = int(m.group(2)), int(m.group(3))
             if 1 <= d <= 4 and 1 <= b <= 6 and CRM[b][d-1]:
-                qs[i]["ai"] = {"dok": d, "bloom": b, "why": (m.group(4) or "").strip()}
+                qs[i]["ai"] = {"dok": d, "bloom": b, "kind": (m.group(4) or "math").lower(), "why": (m.group(5) or "").strip()}
                 qs[i]["dok"], qs[i]["bloom"] = d, b
                 n += 1
     return n
@@ -98,14 +101,17 @@ def main():
 
 
 def summary(corpus, out, model):
-    allq = [q for _, _, qs in corpus for q in qs if q["ai"]]
+    every = [q for _, _, qs in corpus for q in qs if q["ai"]]
+    setup = [q for q in every if q["ai"].get("kind") == "setup"]
+    allq = [q for q in every if q["ai"].get("kind") != "setup"]   # the profile is of the mathematics questions
     grid = collections.Counter((q["bloom"], q["dok"]) for q in allq)
     doks = collections.Counter(q["dok"] for q in allq)
     L = [f"# The AI's questioning, on the Cognitive Rigor Matrix", "",
-         f"{len(corpus)} sessions (the recovered earlier corpus), {sum(len(qs) for _,_,qs in corpus)} questions the AI asked, {len(allq)} tagged by {model}. "
+         f"{len(corpus)} sessions (the recovered earlier corpus), {sum(len(qs) for _,_,qs in corpus)} questions the AI asked, {len(every)} tagged by {model}: "
+         f"{len(setup)} were setup (the profiler asking about preferences, or how to run the session) and are left out below; **{len(allq)} were about the mathematics**, and those are the profile. "
          "Machine tags only; no human coder has touched these yet, and the corpus is the one with the speaker-recovery caveat. Read it as a first profile, not a finding.", "",
          "## Depth of Knowledge, all sessions", "",
-         "| DOK | questions | share |", "|---|---|---|"]
+         "| DOK | math questions | share |", "|---|---|---|"]
     for d in range(1, 5):
         L.append(f"| DOK {d} · {DOK[d-1]} | {doks[d]} | {100*doks[d]/max(1,len(allq)):.0f}% |")
     L += ["", f"Mean DOK {statistics.mean(q['dok'] for q in allq):.2f}." if allq else "", "",
@@ -114,7 +120,7 @@ def summary(corpus, out, model):
         L.append(f"| {BLOOM[b-1]} | " + " | ".join("·" if CRM[b][d-1] is None else str(grid[(b, d)] or "") for d in range(1, 5)) + " |")
     L += ["", "## Per session", "", "| session | AI questions | mean DOK | DOK 1 | DOK 3+ | first half → second half |", "|---|---|---|---|---|---|"]
     for name, nt, qs in corpus:
-        t = [q for q in qs if q["ai"]]
+        t = [q for q in qs if q["ai"] and q["ai"].get("kind") != "setup"]
         if not t:
             L.append(f"| {name} | {len(qs)} | – | | | |"); continue
         h = len(t) // 2 or 1
@@ -123,7 +129,7 @@ def summary(corpus, out, model):
     L += ["", "## Where the DOK 3 and 4 questions are", ""]
     for name, _, qs in corpus:
         for q in qs:
-            if q["ai"] and q["dok"] >= 3:
+            if q["ai"] and q["ai"].get("kind") != "setup" and q["dok"] >= 3:
                 L.append(f"- **{name}** [DOK {q['dok']}, {BLOOM[q['bloom']-1]}] {q['text']}" + (f"  \n  *{q['ai']['why']}*" if q['ai'].get('why') else ""))
     L += ["", "## A run of the most common kind", ""]
     top = grid.most_common(1)[0][0] if grid else None

@@ -393,6 +393,8 @@ $("#goTag").onclick = () => { renderCards(); step(4); };
 
 // ---------- 4 · tagging ----------
 const tq = () => P.lines.map((l, i) => ({ l, i })).filter(x => x.l.q && x.l.who === "T");
+const isSetup = l => l.kind === "setup" || (l.ai && l.ai.kind === "setup" && l.kind !== "math");   // not about the mathematics: the tutor asking about preferences or how to run the session
+const mq = () => tq().filter(({ l }) => !isSetup(l));   // the mathematics questions: what the profile is of
 function renderCards() {
   const box = $("#qcards"); box.textContent = "";
   tq().forEach(({ l, i }, n) => {
@@ -408,6 +410,8 @@ function renderCards() {
     mk("Depth of Knowledge", DOK, "dok", "d"); mk("Bloom's", BLOOM, "bloom", "b");
     c.appendChild(picks);
     const desc = document.createElement("div"); desc.className = "desc"; c.appendChild(desc);
+    const kind = document.createElement("span"); kind.className = "chip" + (isSetup(l) ? " on" : ""); kind.style.marginTop = "6px"; kind.textContent = "setup, not mathematics"; kind.title = "A question about preferences or how to run the session. Left out of the profile.";
+    kind.onclick = () => { l.kind = isSetup(l) ? "math" : "setup"; save(); kind.classList.toggle("on", isSetup(l)); }; c.appendChild(kind);
     const ai = document.createElement("div"); ai.className = "ai hidden"; c.appendChild(ai);
     const up = document.createElement("div"); up.className = "row noprint" ; up.style.marginTop = "8px";
     const ub = document.createElement("button"); ub.className = "quiet"; ub.textContent = "↑ Move it up a level"; ub.title = "Ask for the same question re-asked one level deeper, toward the next cell's descriptor";
@@ -432,7 +436,7 @@ function refresh(c, l) {
 // the machine's turn: a prompt, sent with the student's own key (Journaler's pattern) or carried over by hand
 const MATRIX_TEXT = () => Object.entries(CRM).map(([b, row]) => `Bloom ${b} (${BLOOM[b - 1]}): ` + row.map((t, d) => `DOK ${d + 1}: ${t || "(no such combination)"}`).join(" | ")).join("\n");
 const FRAME = () => `I am a pre-service mathematics teacher learning Hess's Cognitive Rigor Matrix: Webb's Depth of Knowledge (DOK 1 recall and reproduction; DOK 2 basic skills and concepts; DOK 3 strategic thinking and reasoning; DOK 4 extended thinking) crossed with revised Bloom's (1 Remember, 2 Understand, 3 Apply, 4 Analyze, 5 Evaluate, 6 Create). Judge by what the student would actually have to do to answer, not by the verb. Five combinations do not exist: Remember at DOK 2, 3, or 4, and Evaluate at DOK 1 or 2.\n\nThe matrix cells:\n${MATRIX_TEXT()}\n`;
-const tagPrompt = qs => FRAME() + `\nBelow are questions ${P.source ? "an AI tutor asked a student in a typed calculus session" : "I asked a student during " + fmt(P.duration) + " of mathematics talk"}. Tag each one.\nReply with exactly one line per question, in this form and nothing else:\nQ1: DOK 2, Bloom 3 — one short reason\n\nThe questions:\n` + qs.map(({ l }, n) => `Q${n + 1}: ${l.text}`).join("\n");
+const tagPrompt = qs => FRAME() + `\nBelow are questions ${P.source ? "an AI tutor asked a student in a typed calculus session" : "I asked a student during " + fmt(P.duration) + " of mathematics talk"}. Some may be setup rather than mathematics: asking about preferences, feelings, or how to run the session. Tag each one and say which kind it is.\nReply with exactly one line per question, in this form and nothing else:\nQ1: DOK 2, Bloom 3, math — one short reason\n(the fourth field is  math  or  setup)\n\nThe questions:\n` + qs.map(({ l }, n) => `Q${n + 1}: ${l.text}`).join("\n");
 function upTarget(l) {   // the next existing cell up the DOK axis in the same Bloom row, else one Bloom row up at the same DOK
   const b = l.bloom || 2, d = l.dok || 1;
   for (let dd = d + 1; dd <= 4; dd++) if (cellText(b, dd)) return { b, d: dd };
@@ -468,8 +472,8 @@ async function askMachine(prompt) {
 }
 function readTags(text) {
   const qs = tq(); let n = 0;
-  for (const m of text.matchAll(/Q\s*(\d+)\s*[:.)-]\s*DOK[\s-]*(\d)\s*[,;]?\s*Bloom(?:'s)?[\s-]*(\d)\s*(?:[—–:-]\s*(.*))?/gi)) {
-    const q = qs[+m[1] - 1]; if (!q) continue; q.l.ai = { dok: +m[2], bloom: +m[3], why: (m[4] || "").trim() }; n++;
+  for (const m of text.matchAll(/Q\s*(\d+)\s*[:.)-]\s*DOK[\s-]*(\d)\s*[,;]?\s*Bloom(?:'s)?[\s-]*(\d)\s*[,;]?\s*(math|setup)?\s*(?:[—–:-]\s*(.*))?/gi)) {
+    const q = qs[+m[1] - 1]; if (!q) continue; q.l.ai = { dok: +m[2], bloom: +m[3], kind: (m[4] || "").toLowerCase() || undefined, why: (m[5] || "").trim() }; n++;
   }
   save(); $("#aiStatus").textContent = n ? `${n} of ${qs.length} tagged by the machine.` : "Couldn't find lines like  Q1: DOK 2, Bloom 3  in that.";
   document.querySelectorAll(".qcard").forEach(c => refresh(c, P.lines[+c.dataset.i]));
@@ -494,11 +498,11 @@ $("#goSee").onclick = () => { renderSee(); step(5); };
 
 // ---------- 5 · see it ----------
 function renderSee() {
-  const qs = tq(); const tagged = qs.filter(({ l }) => l.dok && l.bloom);
+  const qs = mq(), nSetup = tq().length - qs.length; const tagged = qs.filter(({ l }) => l.dok && l.bloom);
   const mean = tagged.length ? (tagged.reduce((a, { l }) => a + l.dok, 0) / tagged.length).toFixed(1) : "–";
   const d1 = tagged.filter(({ l }) => l.dok === 1).length;
   const agree = qs.filter(({ l }) => l.ai && l.dok && l.bloom && l.ai.dok === l.dok && l.ai.bloom === l.bloom).length, aiN = qs.filter(({ l }) => l.ai).length;
-  $("#stats").innerHTML = `<span class="stat"><b>${qs.length}</b> questions${P.source ? " in " + (P.lines.reduce((m, l) => Math.max(m, l.turn ?? 0), 0) + 1) + " turns" : " in " + fmt(P.duration)}</span><span class="stat"><b>${mean}</b> mean DOK</span><span class="stat"><b>${tagged.length ? Math.round(100 * d1 / tagged.length) : 0}%</b> at DOK 1</span>` + (aiN ? `<span class="stat"><b>${agree}/${aiN}</b> where you and the machine agree</span>` : "");
+  $("#stats").innerHTML = `<span class="stat"><b>${qs.length}</b> questions${P.source ? " in " + (P.lines.reduce((m, l) => Math.max(m, l.turn ?? 0), 0) + 1) + " turns" : " in " + fmt(P.duration)}</span><span class="stat"><b>${mean}</b> mean DOK</span><span class="stat"><b>${tagged.length ? Math.round(100 * d1 / tagged.length) : 0}%</b> at DOK 1</span>` + (aiN ? `<span class="stat"><b>${agree}/${aiN}</b> where you and the machine agree</span>` : "") + (nSetup ? `<span class="stat muted small">${nSetup} setup question${nSetup === 1 ? "" : "s"} left out</span>` : "") + (P.source && P.source.tagged_by ? `<div class="muted small">Tags: ${esc(P.source.tagged_by)}</div>` : "");
   const strip = $("#strip"); strip.textContent = "";
   qs.forEach(({ l }, n) => { const i = document.createElement("i"); i.className = "d" + (l.dok || 0); i.title = `Q${n + 1} · DOK ${l.dok || "?"}, Bloom ${l.bloom || "?"} · ${l.text}`; strip.appendChild(i); });
   // the matrix
@@ -520,7 +524,8 @@ function renderSee() {
   P.lines.forEach(l => {
     const r = t3.insertRow(); r.insertCell().outerHTML = `<td class="w">${l.who || ""}:</td>`;
     let tag = "";
-    if (l.q && l.who === "T") { n++; const mine = l.dok && l.bloom ? `DOK-${l.dok}, Bloom ${l.bloom}` : "untagged"; const diff = l.ai && (l.ai.dok !== l.dok || l.ai.bloom !== l.bloom); tag = ` <span class="tag${diff ? " diff" : ""}">[${mine}${diff ? ` · machine: DOK-${l.ai.dok}, Bloom ${l.ai.bloom}` : ""}]</span>`; }
+    if (l.q && l.who === "T" && isSetup(l)) { tag = ` <span class="tag muted">[setup]</span>`; }
+    else if (l.q && l.who === "T") { n++; const mine = l.dok && l.bloom ? `DOK-${l.dok}, Bloom ${l.bloom}` : "untagged"; const diff = l.ai && (l.ai.dok !== l.dok || l.ai.bloom !== l.bloom); tag = ` <span class="tag${diff ? " diff" : ""}">[${mine}${diff ? ` · machine: DOK-${l.ai.dok}, Bloom ${l.ai.bloom}` : ""}]</span>`; }
     r.insertCell().innerHTML = esc(l.text) + tag;
   });
 }
