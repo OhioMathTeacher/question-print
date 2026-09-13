@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Question Print</title>
+<style>
+:root{
+  --paper:#f6f2ea; --card:#fffdf8; --ink:#221f1a; --muted:#726a5f; --rule:#e4dccd;
+  --accent:#9a5734; --ok:#4a7a55; --warn:#a8622e; --danger:#8b3333;
+  --t:#2f5d6b; --t-bg:#eef4f5; --s:#9a5734; --s-bg:#fbeee7;
+  --dok1:#6b7280; --dok2:#2563eb; --dok3:#0f766e; --dok4:#C41E3A;
+  --dok1-bg:#f3f4f6; --dok2-bg:#dbeafe; --dok3-bg:#d6f0e8; --dok4-bg:#fde8e8;
+  --shadow:0 1px 2px rgba(60,45,25,.05), 0 6px 20px -8px rgba(60,45,25,.14);
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55}
+.wrap{max-width:900px;margin:0 auto;padding:28px 22px 120px}
+h1{font-family:var(--serif);font-weight:600;font-size:30px;margin:0 0 4px}
+h1 small{font-family:var(--sans);font-weight:400;font-size:14px;color:var(--muted);margin-left:10px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:30px 0 10px}
+p.lead{color:var(--muted);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);margin:0 0 16px}
+button{font:inherit;font-size:15px;padding:8px 14px;border-radius:8px;border:1px solid var(--rule);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.quiet{background:none;border-color:transparent;color:var(--muted);padding:4px 8px}
+button:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.drop{border:2px dashed var(--rule);border-radius:12px;padding:26px;text-align:center;color:var(--muted);cursor:pointer}
+.drop.over{border-color:var(--accent);background:var(--t-bg)}
+.muted{color:var(--muted)} .small{font-size:13px}
+.steps{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 22px;font-size:13px}
+.steps span{padding:4px 10px;border-radius:14px;border:1px solid var(--rule);color:var(--muted)}
+.steps span.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.steps span.done{border-color:var(--ok);color:var(--ok)}
+.meter{height:10px;background:var(--rule);border-radius:5px;overflow:hidden;margin:8px 0}
+.meter i{display:block;height:100%;background:var(--ok);width:0;transition:width .2s}
+.wave{display:flex;align-items:flex-end;gap:1px;height:56px;margin:10px 0}
+.wave i{flex:1;background:var(--t);opacity:.7;min-height:1px}
+/* transcript */
+.line{display:grid;grid-template-columns:44px 58px 1fr;gap:10px;padding:7px 0;border-bottom:1px solid var(--rule);align-items:start}
+.line .t{font-family:var(--mono);font-size:12px;color:var(--muted);padding-top:4px}
+.line .who{display:flex;gap:2px}
+.line .who b{display:inline-block;width:26px;text-align:center;border:1px solid var(--rule);border-radius:6px;font-size:13px;padding:2px 0;cursor:pointer;color:var(--muted);user-select:none}
+.line.T .who b.T{background:var(--t);color:#fff;border-color:var(--t)}
+.line.S .who b.S{background:var(--s);color:#fff;border-color:var(--s)}
+.line .txt{outline:none;padding:3px 6px;border-radius:6px;font-family:var(--serif);font-size:17px}
+.line .txt:focus{background:var(--card);box-shadow:inset 0 0 0 1px var(--rule)}
+.line.q .txt{background:var(--t-bg)}
+.line .q-toggle{font-size:12px;color:var(--muted);cursor:pointer;margin-left:6px;white-space:nowrap}
+.line.q .q-toggle{color:var(--t);font-weight:600}
+/* tagging */
+.qcard{border:1px solid var(--rule);border-radius:10px;padding:12px 14px;margin:0 0 10px;background:var(--card)}
+.qcard .qt{font-family:var(--serif);font-size:18px;margin:0 0 8px}
+.qcard .qt em{color:var(--muted);font-style:normal;font-size:13px;font-family:var(--sans);margin-right:8px}
+.picks{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:center;font-size:14px}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.chip{padding:3px 9px;border-radius:12px;border:1px solid var(--rule);cursor:pointer;font-size:13px;user-select:none;background:var(--card)}
+.chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.chip.d1.on{background:var(--dok1);border-color:var(--dok1)} .chip.d2.on{background:var(--dok2);border-color:var(--dok2)}
+.chip.d3.on{background:var(--dok3);border-color:var(--dok3)} .chip.d4.on{background:var(--dok4);border-color:var(--dok4)}
+.chip.dead{opacity:.3;text-decoration:line-through;cursor:not-allowed}
+.desc{font-size:13px;color:var(--muted);margin-top:6px;min-height:1.3em}
+.desc b{color:var(--ink)}
+.ai{margin-top:8px;font-size:13px;padding:6px 10px;border-radius:8px;background:var(--t-bg);color:var(--t)}
+.ai.diff{background:#fdf3e2;color:var(--warn)}
+.ai.same{background:#eaf3ec;color:var(--ok)}
+textarea{width:100%;font:inherit;font-size:14px;padding:10px;border:1px solid var(--rule);border-radius:8px;background:var(--card);color:var(--ink);min-height:110px}
+/* grid */
+table.crm{border-collapse:collapse;width:100%;font-size:13px;table-layout:fixed}
+table.crm th,table.crm td{border:1px solid var(--rule);padding:6px 7px;vertical-align:top}
+table.crm th{background:var(--paper);font-weight:600;text-align:left}
+table.crm th.dok{text-align:center}
+table.crm td.cell{cursor:pointer;min-height:60px;position:relative}
+table.crm td.cell:hover{outline:2px solid var(--accent)}
+table.crm td.cell.on{outline:2px solid var(--ink)}
+table.crm td.dead{background:#e7ecc8;cursor:default}
+table.crm td .n{position:absolute;top:4px;right:6px;font-size:20px;font-weight:700;font-family:var(--serif)}
+table.crm td .n.you{color:var(--ink)} table.crm td .n.ai{font-size:13px;top:26px;color:var(--t)}
+table.crm td .d{color:var(--muted);font-size:11.5px;line-height:1.35;display:block;padding-right:28px}
+table.crm td.cell.has{background:var(--t-bg)}
+.cellq{margin-top:12px}
+.cellq .qt{font-family:var(--serif);font-size:16px;padding:6px 0;border-bottom:1px solid var(--rule)}
+/* strip */
+.strip{display:flex;gap:3px;height:44px;align-items:flex-end;margin:10px 0 4px}
+.strip i{flex:1;border-radius:3px 3px 0 0;cursor:pointer;min-width:6px}
+.strip i.d1{background:var(--dok1);height:25%} .strip i.d2{background:var(--dok2);height:50%}
+.strip i.d3{background:var(--dok3);height:75%} .strip i.d4{background:var(--dok4);height:100%}
+.strip i.d0{background:var(--rule);height:12%}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
+/* table 3 */
+table.t3{border-collapse:collapse;width:100%;font-size:15px}
+table.t3 td{padding:5px 8px;vertical-align:top;border-bottom:1px solid var(--rule)}
+table.t3 td.w{width:26px;font-style:italic;color:var(--muted)}
+table.t3 .tag{color:var(--t);font-size:13px;white-space:nowrap}
+table.t3 .tag.diff{color:var(--warn)}
+.stat{display:inline-block;margin:0 18px 8px 0} .stat b{font-size:22px;font-family:var(--serif)}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+.foot{margin-top:40px;font-size:13px;color:var(--muted)}
+.hidden{display:none!important}
+@media print{ body{background:#fff} .wrap{max-width:none;padding:0} .noprint,.steps,button,.drop{display:none!important} .card{box-shadow:none;break-inside:avoid} h2{margin-top:18px} }
+</style>
+<body>
+<div class="wrap">
+<h1>Question Print <small>the questions you asked, and what they asked for</small></h1>
+<p class="lead">Record five to ten minutes of mathematics talk. Nothing here is uploaded: the recording stays on this computer, the transcript is what you keep. Tag every question you asked by Depth of Knowledge and Bloom's level, then see the shape of your questioning.</p>
+
+<div class="steps noprint" id="steps">
+  <span data-s="1" class="on">1 · Record</span><span data-s="2">2 · Transcribe</span><span data-s="3">3 · Who spoke</span><span data-s="4">4 · Tag</span><span data-s="5">5 · See it</span>
+</div>
+
+<!-- 1 record -->
+<section id="s1" class="card">
+  <h2 style="margin-top:0">1 · A recording</h2>
+  <div class="row">
+    <button id="recBtn" class="primary">● Record here</button>
+    <span class="muted small" id="recStatus">the microphone of this device, until you press Stop</span>
+  </div>
+  <p class="muted small" style="margin:12px 0 6px">or</p>
+  <div class="drop" id="drop">drop an audio file here, or click (m4a, mp3, wav, webm, ogg)</div>
+  <input type="file" id="file" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg" hidden>
+  <div id="audioInfo" class="hidden" style="margin-top:14px">
+    <div class="row"><b id="audioName"></b><span class="muted small" id="audioLen"></span><audio id="player" controls style="height:32px"></audio></div>
+    <div class="wave" id="wave"></div>
+    <p class="muted small" id="audioNote">Play the first stretch. If you can make out the words, the transcriber probably can too. If it is mostly room noise, record again with the phone closer to the table.</p>
+    <div class="row"><label class="small">Model <select id="model"><option value="Xenova/whisper-tiny.en">tiny (fast, rougher)</option><option value="Xenova/whisper-base.en" selected>base (slower, better)</option></select></label>
+      <button id="goTranscribe" class="primary">Transcribe →</button></div>
+  </div>
+</section>
+
+<!-- 2 transcribe -->
+<section id="s2" class="card hidden">
+  <h2 style="margin-top:0">2 · Transcribing</h2>
+  <div class="meter"><i id="tmeter"></i></div>
+  <p class="muted small" id="tstatus">loading the model (once; it is kept by the browser)…</p>
+</section>
+
+<!-- 3 speakers -->
+<section id="s3" class="card hidden">
+  <h2 style="margin-top:0">3 · Who spoke, and which lines are questions</h2>
+  <p class="muted small">Tap <b>T</b> on the lines that are yours (the teacher's) and <b>S</b> on the student's. Fix any words the transcriber got wrong by clicking into the text. Lines ending in a question mark are marked as questions; toggle any the transcriber missed or over-marked. Only the teacher's questions get tagged.</p>
+  <div class="row noprint" style="margin-bottom:8px">
+    <button id="allT" class="quiet">All lines → T</button><button id="qLinesT" class="quiet">Lines with ? → T, the rest → S</button>
+    <span class="muted small" id="qcount"></span>
+    <span style="flex:1"></span><button id="goTag" class="primary">Tag the questions →</button>
+  </div>
+  <div id="lines"></div>
+</section>
+
+<!-- 4 tag -->
+<section id="s4" class="card hidden">
+  <h2 style="margin-top:0">4 · Tag each question: what would the student have to <i>do</i>?</h2>
+  <p class="muted small">Judge by what answering would take, not by the verb. Depth of Knowledge is how far the thinking has to go; Bloom's is what kind of thinking. The matrix cell tells you what that combination looks like. Five combinations do not exist (shaded); the app will say so.</p>
+  <div class="row noprint" style="margin-bottom:12px">
+    <span class="muted small">Tag them yourself first. Then let the machine try, and see where you part ways.</span>
+    <span style="flex:1"></span><button id="goSee" class="primary">See it →</button>
+  </div>
+  <details class="noprint" id="machine" style="margin-bottom:14px">
+    <summary style="cursor:pointer;color:var(--muted);font-size:14px">The machine's turn</summary>
+    <div class="row" style="margin:10px 0 6px">
+      <label class="small">How <select id="prov">
+        <option value="paste">copy a prompt, paste the reply back (no key)</option>
+        <option value="gemini">Gemini, with my API key</option>
+        <option value="groq">Groq, with my API key</option>
+        <option value="anthropic">Claude, with my API key</option>
+      </select></label>
+      <input type="password" id="apikey" placeholder="API key · kept only in this browser" autocomplete="off" spellcheck="false" style="font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--card);color:var(--ink);min-width:260px" class="hidden">
+    </div>
+    <div class="row">
+      <button id="aiGo" class="primary">Tag every question</button>
+      <button id="aiPaste" class="hidden">Paste the reply…</button>
+      <span class="muted small" id="aiStatus"></span>
+    </div>
+    <div id="aiBox" class="hidden" style="margin-top:8px">
+      <textarea id="aiText" placeholder="Paste the reply here. The app reads lines like:  Q3: DOK 2, Bloom 3 — because…"></textarea>
+      <div class="row" style="margin-top:6px"><button id="aiRead" class="primary">Read the tags</button></div>
+    </div>
+    <p class="muted small" style="margin:8px 0 0">With a key, the questions go to that company and nothing else does: not the audio, not the student's lines. Without one, you carry the questions over yourself.</p>
+  </details>
+  <div id="qcards"></div>
+</section>
+
+<!-- 5 see -->
+<section id="s5" class="hidden">
+  <div class="card">
+    <h2 style="margin-top:0">The shape of it</h2>
+    <div id="stats"></div>
+    <div class="strip" id="strip"></div>
+    <div class="legend"><span><i style="background:var(--dok1)"></i>DOK 1</span><span><i style="background:var(--dok2)"></i>DOK 2</span><span><i style="background:var(--dok3)"></i>DOK 3</span><span><i style="background:var(--dok4)"></i>DOK 4</span><span><i style="background:var(--rule)"></i>untagged</span></div>
+    <p class="muted small">Left to right through the recording, one bar per question you asked. Height is Depth of Knowledge.</p>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">The Cognitive Rigor Matrix</h2>
+    <p class="muted small">Your counts, large; the machine's, small and blue, where it tagged. Click a cell to read its questions beside what that cell asks for. Adapted from Hess, Jones, Carlock &amp; Walkup (2009).</p>
+    <div style="overflow-x:auto"><table class="crm" id="crm"></table></div>
+    <div class="cellq" id="cellq"></div>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">The transcript, tagged</h2>
+    <p class="muted small">As in the article's Table 3. Where you and the machine disagreed, both tags are shown.</p>
+    <table class="t3" id="t3"></table>
+  </div>
+  <div class="card noprint">
+    <h2 style="margin-top:0">Keep it</h2>
+    <div class="row">
+      <button id="printBtn" class="primary">Print / save as PDF</button>
+      <button id="jsonBtn">Download the JSON</button>
+      <button id="txtBtn">Copy the transcript (pseudonyms are yours to add)</button>
+      <span style="flex:1"></span>
+      <button id="reset" class="quiet">Start over</button>
+    </div>
+    <p class="muted small">The PDF is what you attach. The audio is never part of it.</p>
+  </div>
+</section>
+
+<p class="foot">Question Print · runs entirely in your browser · Whisper via Transformers.js · matrix adapted from Hess et al. (2009) · TCE 318P, Miami University</p>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- the matrix: Hess's Cognitive Rigor Matrix (Table 1 of the Week 4 article) ----------
+const BLOOM = ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"];
+const DOK = ["Recall & Reproduction", "Basic Skills & Concepts", "Strategic Thinking & Reasoning", "Extended Thinking"];
+const CRM = {   // [bloom][dok] -> descriptor; null = the combination does not exist
+  1: ["Recall, recognize, and locate basic facts, ideas, and principles", null, null, null],
+  2: ["Describe or explain how (the steps of a specified algorithm)", "Specify and explain relationships (why a specified algorithm is reasonable)", "Explain strategies and reasoning for solving tasks where the procedure has not been specified", "Explain how concepts or ideas relate to other content domains or concepts"],
+  3: ["Apply an algorithm or formula", "Solve routine problems applying multiple concepts or decision points", "Use concepts to solve nonroutine problems", "Select or devise an approach among many alternatives to solve a novel problem"],
+  4: ["Retrieve information from a table or graph to answer a question", "Compare and contrast figures or data", "Generalize a pattern", "Gather, analyze, and organize information"],
+  5: [null, null, "Verify reasonableness of results", "Draw and justify conclusions"],
+  6: ["Brainstorm ideas, concepts, or perspectives related to a topic", "Generate conjectures or hypotheses based on observations or prior knowledge", "Formulate an original problem", "Design a model to inform and solve real-world, complex, or abstract situations"],
+};
+const cellText = (b, d) => (b && d) ? CRM[b][d - 1] : null;
+
+// ---------- state ----------
+const $ = s => document.querySelector(s);
+let P = { name: "", duration: 0, lines: [], model: "" };   // lines: {t0, t1, text, who:'T'|'S'|'', q:bool, dok, bloom, ai:{dok,bloom,why}}
+let audioF32 = null, audioBlobURL = null;
+const save = () => { try { localStorage.setItem("qp", JSON.stringify(P)); } catch {} };
+const toast = m => { const t = $("#toast"); t.textContent = m; t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 2200); };
+function step(n) { document.querySelectorAll("#steps span").forEach(s => { const k = +s.dataset.s; s.classList.toggle("on", k === n); s.classList.toggle("done", k < n); }); for (let i = 1; i <= 5; i++) $("#s" + i).classList.toggle("hidden", i !== n); window.scrollTo({ top: 0 }); }
+
+// ---------- 1 · audio in ----------
+async function loadAudio(file) {
+  P.name = file.name || "recording"; $("#audioName").textContent = P.name;
+  if (audioBlobURL) URL.revokeObjectURL(audioBlobURL);
+  audioBlobURL = URL.createObjectURL(file); $("#player").src = audioBlobURL;
+  const buf = await file.arrayBuffer();
+  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  const decoded = await ac.decodeAudioData(buf.slice(0));
+  P.duration = decoded.duration;
+  $("#audioLen").textContent = fmt(decoded.duration) + (decoded.duration > 720 ? " · long; the first ten minutes are plenty" : "");
+  // mono, 16 kHz, which is what Whisper wants
+  const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
+  const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start();
+  audioF32 = (await off.startRendering()).getChannelData(0);
+  drawWave(audioF32);
+  $("#audioInfo").classList.remove("hidden");
+  ac.close();
+}
+function drawWave(f) {
+  const w = $("#wave"); w.textContent = ""; const n = 120, step = Math.floor(f.length / n);
+  let peak = 0; const bars = [];
+  for (let i = 0; i < n; i++) { let m = 0; for (let j = i * step; j < (i + 1) * step; j += 16) m = Math.max(m, Math.abs(f[j])); bars.push(m); peak = Math.max(peak, m); }
+  for (const b of bars) { const i = document.createElement("i"); i.style.height = Math.max(2, 100 * b / (peak || 1)) + "%"; w.appendChild(i); }
+  const rms = Math.sqrt(f.reduce((a, x) => a + x * x, 0) / f.length);
+  if (rms < 0.01) $("#audioNote").innerHTML = "<b style='color:var(--warn)'>This recording is very quiet.</b> Play it. If the words are hard to hear, record again closer to the speakers before spending time on a transcript.";
+}
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+$("#drop").onclick = () => $("#file").click();
+$("#file").onchange = e => e.target.files[0] && loadAudio(e.target.files[0]);
+$("#drop").ondragover = e => { e.preventDefault(); $("#drop").classList.add("over"); };
+$("#drop").ondragleave = () => $("#drop").classList.remove("over");
+$("#drop").ondrop = e => { e.preventDefault(); $("#drop").classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) loadAudio(f); };
+
+// in-app recording
+let rec = null, chunks = [];
+$("#recBtn").onclick = async () => {
+  if (rec && rec.state === "recording") { rec.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    chunks = []; rec = new MediaRecorder(stream);
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" }); blob.name = "recording-" + new Date().toISOString().slice(0, 16).replace("T", "-") + ".webm"; loadAudio(blob); $("#recBtn").textContent = "● Record here"; $("#recStatus").textContent = "recorded"; clearInterval(tick); };
+    rec.start(); const t0 = Date.now(); $("#recBtn").textContent = "■ Stop";
+    var tick = setInterval(() => $("#recStatus").textContent = "recording " + fmt((Date.now() - t0) / 1000) + " · phone or laptop close to the table", 500);
+  } catch (e) { toast("No microphone: " + e.message); }
+};
+
+// ---------- 2 · transcribe (Whisper, in a worker, from the CDN) ----------
+const WORKER_SRC = `
+import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3";
+env.allowLocalModels = false;
+let asr = null, model = "";
+self.onmessage = async ({ data }) => {
+  try {
+    if (!asr || model !== data.model) {
+      model = data.model;
+      asr = await pipeline("automatic-speech-recognition", model, { progress_callback: p => self.postMessage({ kind: "load", p }) });
+    }
+    self.postMessage({ kind: "status", msg: "listening…" });
+    const out = await asr(data.audio, { chunk_length_s: 30, stride_length_s: 5, return_timestamps: true,
+      callback_function: () => {}, });
+    self.postMessage({ kind: "done", out });
+  } catch (e) { self.postMessage({ kind: "error", msg: String(e && e.message || e) }); }
+};`;
+let worker = null;
+$("#goTranscribe").onclick = () => {
+  if (!audioF32) return;
+  P.model = $("#model").value; step(2);
+  if (!worker) {
+    worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: "text/javascript" })), { type: "module" });
+    worker.onmessage = ({ data }) => {
+      if (data.kind === "load") { if (data.p.status === "progress") { $("#tmeter").firstElementChild.style.width = Math.round(data.p.progress || 0) + "%"; $("#tstatus").textContent = `loading ${data.p.file || "the model"} … ${Math.round(data.p.progress || 0)}%`; } }
+      if (data.kind === "status") { $("#tstatus").textContent = data.msg + " (a ten-minute recording takes a few minutes; leave this tab open)"; $("#tmeter").firstElementChild.style.width = "100%"; }
+      if (data.kind === "error") { $("#tstatus").innerHTML = "<b style='color:var(--danger)'>" + data.msg + "</b> — reload and try the tiny model, or a shorter file."; }
+      if (data.kind === "done") { gotTranscript(data.out); }
+    };
+    worker.onerror = e => { $("#tstatus").innerHTML = "<b style='color:var(--danger)'>" + (e.message || "the transcriber failed to start") + "</b>"; };
+  }
+  const slice = audioF32.length > 16000 * 720 ? audioF32.slice(0, 16000 * 720) : audioF32;   // twelve minutes, at most
+  worker.postMessage({ model: P.model, audio: slice });
+};
+function gotTranscript(out) {
+  // Whisper's chunks are phrases with timestamps. Split them into sentences so a question can stand alone.
+  const lines = [];
+  for (const c of (out.chunks || [{ timestamp: [0, P.duration], text: out.text }])) {
+    const [t0, t1] = c.timestamp; const text = (c.text || "").trim(); if (!text) continue;
+    const parts = text.match(/[^.?!]+[.?!]+["']?|[^.?!]+$/g) || [text];
+    const span = ((t1 ?? t0) - t0) / Math.max(1, parts.join("").length);
+    let at = t0;
+    for (const p of parts) { const s = p.trim(); if (!s) continue; lines.push({ t0: at, t1: at + span * p.length, text: s, who: "", q: /\?\s*$/.test(s) || /^(what|why|how|which|where|when|who|can|could|would|do|does|did|is|are|tell me|explain)\b/i.test(s) && s.length < 160, dok: 0, bloom: 0, ai: null }); at += span * p.length; }
+  }
+  P.lines = lines; guessSpeakers(); save(); renderLines(); step(3);
+}
+function guessSpeakers() { for (const l of P.lines) l.who = l.q ? "T" : "S"; }   // a first guess: the questioner is the teacher
+
+// ---------- 3 · speakers and questions ----------
+function renderLines() {
+  const box = $("#lines"); box.textContent = "";
+  P.lines.forEach((l, i) => {
+    const d = document.createElement("div"); d.className = "line " + l.who + (l.q ? " q" : ""); d.dataset.i = i;
+    const t = document.createElement("div"); t.className = "t"; t.textContent = fmt(l.t0);
+    const who = document.createElement("div"); who.className = "who";
+    for (const w of ["T", "S"]) { const b = document.createElement("b"); b.className = w; b.textContent = w; b.title = w === "T" ? "the teacher (you)" : "the student"; b.onclick = () => { l.who = w; d.className = "line " + l.who + (l.q ? " q" : ""); save(); }; who.appendChild(b); }
+    const txt = document.createElement("div"); txt.className = "txt"; txt.contentEditable = "true"; txt.spellcheck = false; txt.textContent = l.text;
+    txt.onblur = () => { l.text = txt.textContent.trim(); save(); };
+    txt.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); txt.blur(); } };
+    const qt = document.createElement("span"); qt.className = "q-toggle"; qt.textContent = l.q ? "question" : "mark as question";
+    qt.onclick = () => { l.q = !l.q; d.className = "line " + l.who + (l.q ? " q" : ""); qt.textContent = l.q ? "question" : "mark as question"; save(); count(); };
+    txt.appendChild(qt);
+    d.append(t, who, txt); box.appendChild(d);
+  });
+  count();
+}
+function count() { const n = P.lines.filter(l => l.q && l.who === "T").length; $("#qcount").textContent = `${n} teacher question${n === 1 ? "" : "s"}`; }
+$("#allT").onclick = () => { P.lines.forEach(l => l.who = "T"); save(); renderLines(); };
+$("#qLinesT").onclick = () => { guessSpeakers(); save(); renderLines(); };
+$("#goTag").onclick = () => { renderCards(); step(4); };
+
+// ---------- 4 · tagging ----------
+const tq = () => P.lines.map((l, i) => ({ l, i })).filter(x => x.l.q && x.l.who === "T");
+function renderCards() {
+  const box = $("#qcards"); box.textContent = "";
+  tq().forEach(({ l, i }, n) => {
+    const c = document.createElement("div"); c.className = "qcard"; c.dataset.i = i;
+    const qt = document.createElement("p"); qt.className = "qt"; const em = document.createElement("em"); em.textContent = "Q" + (n + 1) + " · " + fmt(l.t0); qt.append(em, document.createTextNode(l.text)); c.appendChild(qt);
+    const picks = document.createElement("div"); picks.className = "picks";
+    const mk = (label, items, key, cls) => {
+      const lab = document.createElement("span"); lab.textContent = label; const chips = document.createElement("div"); chips.className = "chips";
+      items.forEach((name, k) => { const v = k + 1; const ch = document.createElement("span"); ch.className = "chip " + cls + v + (l[key] === v ? " on" : ""); ch.textContent = (cls === "d" ? "DOK " : "") + v + (cls === "b" ? " " + name : ""); ch.title = cls === "d" ? name : "";
+        ch.onclick = () => { if (ch.classList.contains("dead")) { toast("That combination doesn't exist on the matrix: " + BLOOM[l.bloom - 1] + " at DOK " + v); return; } l[key] = l[key] === v ? 0 : v; save(); refresh(c, l); }; chips.appendChild(ch); });
+      picks.append(lab, chips);
+    };
+    mk("Depth of Knowledge", DOK, "dok", "d"); mk("Bloom's", BLOOM, "bloom", "b");
+    c.appendChild(picks);
+    const desc = document.createElement("div"); desc.className = "desc"; c.appendChild(desc);
+    const ai = document.createElement("div"); ai.className = "ai hidden"; c.appendChild(ai);
+    const up = document.createElement("div"); up.className = "row noprint" ; up.style.marginTop = "8px";
+    const ub = document.createElement("button"); ub.className = "quiet"; ub.textContent = "↑ Move it up a level"; ub.title = "Ask for the same question re-asked one level deeper, toward the next cell's descriptor";
+    const uo = document.createElement("div"); uo.className = "desc"; uo.style.flexBasis = "100%";
+    ub.onclick = () => moveUp(l, uo); up.append(ub, uo); c.appendChild(up);
+    box.appendChild(c); refresh(c, l);
+  });
+}
+function refresh(c, l) {
+  c.querySelectorAll(".chip").forEach(ch => {
+    const isD = ch.classList.contains("d1") || ch.classList.contains("d2") || ch.classList.contains("d3") || ch.classList.contains("d4");
+    const v = +ch.textContent.replace(/\D+/g, "").slice(0, 1);
+    ch.classList.toggle("on", isD ? l.dok === v : l.bloom === v);
+    ch.classList.toggle("dead", isD ? (l.bloom && cellText(l.bloom, v) === null) : (l.dok && cellText(v, l.dok) === null));
+  });
+  const d = c.querySelector(".desc"); const t = cellText(l.bloom, l.dok);
+  d.innerHTML = l.bloom && l.dok ? (t ? `<b>${BLOOM[l.bloom - 1]} at DOK ${l.dok}:</b> ${t}` : `<b style="color:var(--danger)">${BLOOM[l.bloom - 1]} at DOK ${l.dok} isn't a combination on the matrix.</b> Which did you mean?`) : l.bloom ? `<b>${BLOOM[l.bloom - 1]}.</b> Now, how far does the thinking have to go?` : l.dok ? `<b>DOK ${l.dok}: ${DOK[l.dok - 1]}.</b> Now, what kind of thinking?` : "";
+  const a = c.querySelector(".ai");
+  if (l.ai) { const same = l.ai.dok === l.dok && l.ai.bloom === l.bloom; a.className = "ai " + (l.dok && l.bloom ? (same ? "same" : "diff") : ""); a.textContent = `The machine says DOK ${l.ai.dok}, Bloom ${l.ai.bloom}${l.ai.why ? ": " + l.ai.why : ""}` + (l.dok && l.bloom ? (same ? " · you agree" : " · you said DOK " + l.dok + ", Bloom " + l.bloom + ". Who's right?") : ""); }
+  else a.className = "ai hidden";
+}
+// the machine's turn: a prompt, sent with the student's own key (Journaler's pattern) or carried over by hand
+const MATRIX_TEXT = () => Object.entries(CRM).map(([b, row]) => `Bloom ${b} (${BLOOM[b - 1]}): ` + row.map((t, d) => `DOK ${d + 1}: ${t || "(no such combination)"}`).join(" | ")).join("\n");
+const FRAME = () => `I am a pre-service mathematics teacher learning Hess's Cognitive Rigor Matrix: Webb's Depth of Knowledge (DOK 1 recall and reproduction; DOK 2 basic skills and concepts; DOK 3 strategic thinking and reasoning; DOK 4 extended thinking) crossed with revised Bloom's (1 Remember, 2 Understand, 3 Apply, 4 Analyze, 5 Evaluate, 6 Create). Judge by what the student would actually have to do to answer, not by the verb. Five combinations do not exist: Remember at DOK 2, 3, or 4, and Evaluate at DOK 1 or 2.\n\nThe matrix cells:\n${MATRIX_TEXT()}\n`;
+const tagPrompt = qs => FRAME() + `\nBelow are questions I asked a student during ${fmt(P.duration)} of mathematics talk. Tag each one.\nReply with exactly one line per question, in this form and nothing else:\nQ1: DOK 2, Bloom 3 — one short reason\n\nThe questions:\n` + qs.map(({ l }, n) => `Q${n + 1}: ${l.text}`).join("\n");
+function upTarget(l) {   // the next existing cell up the DOK axis in the same Bloom row, else one Bloom row up at the same DOK
+  const b = l.bloom || 2, d = l.dok || 1;
+  for (let dd = d + 1; dd <= 4; dd++) if (cellText(b, dd)) return { b, d: dd };
+  for (let bb = b + 1; bb <= 6; bb++) if (cellText(bb, d)) return { b: bb, d };
+  return null;
+}
+const upPrompt = (l, t) => FRAME() + `\nHere is a question I asked, which I tagged DOK ${l.dok || "?"}, Bloom ${l.bloom || "?"}:\n"${l.text}"\n\nRe-ask it one level deeper, aiming at ${BLOOM[t.b - 1]} at DOK ${t.d}: "${cellText(t.b, t.d)}". Keep it about the same mathematics and the same moment in the lesson; a real teacher should be able to say it out loud to this student. Reply with the new question on the first line, then one sentence on what the student now has to do that they did not before.`;
+
+const KEYS = { gemini: "qp-key-gemini", groq: "qp-key-groq", anthropic: "qp-key-anthropic" };
+$("#prov").value = localStorage.getItem("qp-prov") || "paste";
+function provChanged() { const v = $("#prov").value; localStorage.setItem("qp-prov", v); $("#apikey").classList.toggle("hidden", v === "paste"); $("#apikey").value = localStorage.getItem(KEYS[v] || "") || ""; $("#aiPaste").classList.toggle("hidden", v !== "paste"); $("#aiGo").textContent = v === "paste" ? "Copy the prompt" : "Tag every question"; }
+$("#prov").onchange = provChanged; provChanged();
+$("#apikey").onchange = () => localStorage.setItem(KEYS[$("#prov").value], $("#apikey").value.trim());
+
+async function askMachine(prompt) {
+  const prov = $("#prov").value, key = $("#apikey").value.trim();
+  if (!key) throw new Error("No key. Paste one, or choose the copy-and-paste way.");
+  if (prov === "gemini") {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+    if (!r.ok) throw new Error("Gemini said " + r.status); const j = await r.json(); return j.candidates?.[0]?.content?.parts?.map(p => p.text).join("") || "";
+  }
+  if (prov === "groq") {
+    let model = "openai/gpt-oss-120b";
+    try { const m = await (await fetch("https://api.groq.com/openai/v1/models", { headers: { Authorization: "Bearer " + key } })).json(); const ids = (m.data || []).map(x => x.id); model = ["openai/gpt-oss-120b", "qwen/qwen3.6-27b", "openai/gpt-oss-20b"].find(p => ids.includes(p)) || ids.find(i => /70b|120b|instruct|versatile/.test(i)) || model; } catch {}
+    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + key }, body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], temperature: 0.2 }) });
+    if (!r.ok) throw new Error("Groq said " + r.status); const j = await r.json(); return j.choices?.[0]?.message?.content || "";
+  }
+  if (prov === "anthropic") {
+    const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-5", max_tokens: 2000, messages: [{ role: "user", content: prompt }] }) });
+    if (!r.ok) throw new Error("Claude said " + r.status); const j = await r.json(); return (j.content || []).map(c => c.text || "").join("");
+  }
+  throw new Error("Pick a provider.");
+}
+function readTags(text) {
+  const qs = tq(); let n = 0;
+  for (const m of text.matchAll(/Q\s*(\d+)\s*[:.)-]\s*DOK[\s-]*(\d)\s*[,;]?\s*Bloom(?:'s)?[\s-]*(\d)\s*(?:[—–:-]\s*(.*))?/gi)) {
+    const q = qs[+m[1] - 1]; if (!q) continue; q.l.ai = { dok: +m[2], bloom: +m[3], why: (m[4] || "").trim() }; n++;
+  }
+  save(); $("#aiStatus").textContent = n ? `${n} of ${qs.length} tagged by the machine.` : "Couldn't find lines like  Q1: DOK 2, Bloom 3  in that.";
+  document.querySelectorAll(".qcard").forEach(c => refresh(c, P.lines[+c.dataset.i]));
+}
+async function copyText(t) { try { await navigator.clipboard.writeText(t); } catch { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); } }
+$("#aiGo").onclick = async () => {
+  const qs = tq(); if (!qs.length) { toast("No teacher questions yet."); return; }
+  if ($("#prov").value === "paste") { await copyText(tagPrompt(qs)); $("#aiBox").classList.remove("hidden"); toast("Copied. Paste it into Gemini (or any chatbot), then paste the reply back here."); return; }
+  $("#aiStatus").textContent = "asking…";
+  try { readTags(await askMachine(tagPrompt(qs))); } catch (e) { $("#aiStatus").textContent = e.message; }
+};
+$("#aiPaste").onclick = () => $("#aiBox").classList.toggle("hidden");
+$("#aiRead").onclick = () => readTags($("#aiText").value);
+async function moveUp(l, out) {
+  const t = upTarget(l); if (!t) { out.textContent = "Already at the top of the matrix."; return; }
+  const prompt = upPrompt(l, t);
+  if ($("#prov").value === "paste") { await copyText(prompt); out.innerHTML = `Copied a prompt aimed at <b>${BLOOM[t.b - 1]} at DOK ${t.d}</b>. Paste it into your chatbot and bring the question back by hand.`; return; }
+  out.textContent = "asking…";
+  try { const r = await askMachine(prompt); l.up = { b: t.b, d: t.d, text: r.trim() }; save(); out.innerHTML = `<b>Toward ${BLOOM[t.b - 1]} at DOK ${t.d}:</b> ${esc(r.trim()).replace(/\n/g, "<br>")}`; } catch (e) { out.textContent = e.message; }
+}
+$("#goSee").onclick = () => { renderSee(); step(5); };
+
+// ---------- 5 · see it ----------
+function renderSee() {
+  const qs = tq(); const tagged = qs.filter(({ l }) => l.dok && l.bloom);
+  const mean = tagged.length ? (tagged.reduce((a, { l }) => a + l.dok, 0) / tagged.length).toFixed(1) : "–";
+  const d1 = tagged.filter(({ l }) => l.dok === 1).length;
+  const agree = qs.filter(({ l }) => l.ai && l.dok && l.bloom && l.ai.dok === l.dok && l.ai.bloom === l.bloom).length, aiN = qs.filter(({ l }) => l.ai).length;
+  $("#stats").innerHTML = `<span class="stat"><b>${qs.length}</b> questions in ${fmt(P.duration)}</span><span class="stat"><b>${mean}</b> mean DOK</span><span class="stat"><b>${tagged.length ? Math.round(100 * d1 / tagged.length) : 0}%</b> at DOK 1</span>` + (aiN ? `<span class="stat"><b>${agree}/${aiN}</b> where you and the machine agree</span>` : "");
+  const strip = $("#strip"); strip.textContent = "";
+  qs.forEach(({ l }, n) => { const i = document.createElement("i"); i.className = "d" + (l.dok || 0); i.title = `Q${n + 1} · DOK ${l.dok || "?"}, Bloom ${l.bloom || "?"} · ${l.text}`; strip.appendChild(i); });
+  // the matrix
+  const t = $("#crm"); t.textContent = "";
+  const thead = t.createTHead(); const r0 = thead.insertRow(); r0.insertCell().outerHTML = "<th></th>"; DOK.forEach((d, k) => { const th = document.createElement("th"); th.className = "dok"; th.textContent = `DOK ${k + 1}: ${d}`; r0.appendChild(th); });
+  const tb = t.createTBody();
+  BLOOM.forEach((b, bi) => {
+    const r = tb.insertRow(); const th = document.createElement("th"); th.textContent = `${b} (Bloom ${bi + 1})`; r.appendChild(th);
+    for (let dk = 1; dk <= 4; dk++) {
+      const td = r.insertCell(); const txt = cellText(bi + 1, dk);
+      if (!txt) { td.className = "dead"; continue; }
+      const mine = qs.filter(({ l }) => l.bloom === bi + 1 && l.dok === dk), ai = qs.filter(({ l }) => l.ai && l.ai.bloom === bi + 1 && l.ai.dok === dk);
+      td.className = "cell" + (mine.length ? " has" : ""); td.innerHTML = `<span class="d">${txt}</span>` + (mine.length ? `<span class="n you">${mine.length}</span>` : "") + (ai.length ? `<span class="n ai">${ai.length}</span>` : "");
+      td.onclick = () => { t.querySelectorAll("td.on").forEach(x => x.classList.remove("on")); td.classList.add("on"); const box = $("#cellq"); box.innerHTML = `<p class="muted small"><b>${b} at DOK ${dk}:</b> ${txt}</p>` + (mine.length ? mine.map(({ l }, ) => `<div class="qt">${esc(l.text)}</div>`).join("") : `<p class="muted small">You tagged nothing here.</p>`) + (ai.length ? `<p class="muted small" style="margin-top:8px">The machine put here:</p>` + ai.map(({ l }) => `<div class="qt" style="color:var(--t)">${esc(l.text)}</div>`).join("") : ""); };
+    }
+  });
+  // table 3
+  const t3 = $("#t3"); t3.textContent = ""; let n = 0;
+  P.lines.forEach(l => {
+    const r = t3.insertRow(); r.insertCell().outerHTML = `<td class="w">${l.who || ""}:</td>`;
+    let tag = "";
+    if (l.q && l.who === "T") { n++; const mine = l.dok && l.bloom ? `DOK-${l.dok}, Bloom ${l.bloom}` : "untagged"; const diff = l.ai && (l.ai.dok !== l.dok || l.ai.bloom !== l.bloom); tag = ` <span class="tag${diff ? " diff" : ""}">[${mine}${diff ? ` · machine: DOK-${l.ai.dok}, Bloom ${l.ai.bloom}` : ""}]</span>`; }
+    r.insertCell().innerHTML = esc(l.text) + tag;
+  });
+}
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+$("#printBtn").onclick = () => window.print();
+$("#jsonBtn").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ app: "question-print", name: P.name, duration: P.duration, model: P.model, lines: P.lines }, null, 1)], { type: "application/json" })); a.download = (P.name.replace(/\.[^.]+$/, "") || "question-print") + ".json"; a.click(); };
+$("#txtBtn").onclick = async () => { const txt = P.lines.map(l => `${l.who || " "}: ${l.text}` + (l.q && l.who === "T" && l.dok && l.bloom ? ` [DOK-${l.dok}, Bloom ${l.bloom}]` : "")).join("\n"); try { await navigator.clipboard.writeText(txt); toast("Transcript copied."); } catch { toast("Couldn't copy."); } };
+$("#reset").onclick = () => { if (confirm("Start over? The transcript and tags on this page are cleared. (No recording is stored.)")) { localStorage.removeItem("qp"); location.reload(); } };
+document.querySelectorAll("#steps span").forEach(s => s.onclick = () => { const k = +s.dataset.s; if (k === 1 || (k >= 3 && P.lines.length)) { if (k === 4) renderCards(); if (k === 5) renderSee(); step(k); } });
+
+// ---------- resume ----------
+try { const saved = JSON.parse(localStorage.getItem("qp") || "null"); if (saved && saved.lines && saved.lines.length) { P = saved; renderLines(); step(3); toast("Picked up where you left off. Start over is at the end."); } } catch {}
+</script>
+</body>
+</html>
