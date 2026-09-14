@@ -21,9 +21,15 @@ localStorage resume.
 (math/setup label, one droppable `*.qp.json` per session, `summary.md`). Ran over the
 11 recovered Taylor sessions → `TEA-Taylor-DATA/Analysis/question-print/`.
 
-**Not yet opened by a person.** 14 Sept: loaded in headless Chromium with no
-exceptions (five steps render); the Whisper worker was not exercised, since it starts
-only on transcribe. The Firefox open and a real audio file are still the cold test.
+**First real run, 14 Sept (headless Chromium, driven by DevTools).** Todd's drop of
+a Wikimedia *page* saved as `.ogg` did nothing, silently: now a drop the decoder
+refuses says what it was (web page / PDF / undecodable) in a toast. With the real
+recording (`fall-2026/audio/kwik-e-mart-security-guard.ogg`, 45 s Vorbis): loads at
+0:45 with a waveform; Transcribe loaded whisper-tiny.en from the CDN and produced 7
+lines in ~9 s, questions flagged, speakers guessed. Found and fixed on that run: the
+progress handler read `#tmeter.firstElementChild` (the `<i>` *is* `#tmeter`), so every
+model-download message threw and the meter never moved. Still untested by a person, and
+untested in Firefox.
 
 **Splitter fixed (14 Sept).** One `splitSentences` in `index.html` (both the Whisper
 and the Verbatim paths) mirrored by `split_sentences` in `tools/tag-sessions.py`:

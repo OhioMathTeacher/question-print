@@ -245,7 +245,7 @@ const $ = s => document.querySelector(s);
 let P = { name: "", duration: 0, lines: [], model: "" };   // lines: {t0, t1, text, who:'T'|'S'|'', q:bool, dok, bloom, ai:{dok,bloom,why}}
 let audioF32 = null, audioBlobURL = null;
 const save = () => { try { localStorage.setItem("qp", JSON.stringify(P)); } catch {} };
-const toast = m => { const t = $("#toast"); t.textContent = m; t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 2200); };
+const toast = (m, ms = 2200) => { const t = $("#toast"); t.textContent = m; t.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("on"), ms); };
 function step(n) { document.querySelectorAll("#steps span").forEach(s => { const k = +s.dataset.s; s.classList.toggle("on", k === n); s.classList.toggle("done", k < n); }); for (let i = 1; i <= 5; i++) $("#s" + i).classList.toggle("hidden", i !== n); window.scrollTo({ top: 0 }); }
 
 // ---------- 1 · audio in ----------
@@ -255,7 +255,20 @@ async function loadAudio(file) {
   audioBlobURL = URL.createObjectURL(file); $("#player").src = audioBlobURL;
   const buf = await file.arrayBuffer();
   const ac = new (window.AudioContext || window.webkitAudioContext)();
-  const decoded = await ac.decodeAudioData(buf.slice(0));
+  let decoded;
+  try { decoded = await ac.decodeAudioData(buf.slice(0)); }
+  catch (e) {
+    // A drop that is not audio (a web page saved under the audio's name, a PDF) must say so;
+    // a silent failure looks like the app did nothing.
+    ac.close();
+    const head = new TextDecoder().decode(new Uint8Array(buf.slice(0, 64))).trimStart().toLowerCase();
+    const what = head.startsWith("<!doctype html") || head.startsWith("<html") ? "That is a web page, not a recording"
+               : head.startsWith("%pdf") ? "That is a PDF, not a recording"
+               : "This browser cannot decode that file as audio";
+    $("#audioName").textContent = P.name + " · not loaded";
+    toast(`${what}: ${P.name}. Drop an .mp3, .m4a, .wav, .ogg or .webm.`, 8000);
+    return;
+  }
   P.duration = decoded.duration;
   $("#audioLen").textContent = fmt(decoded.duration) + (decoded.duration > 720 ? " · long; the first ten minutes are plenty" : "");
   // mono, 16 kHz, which is what Whisper wants
@@ -369,8 +382,8 @@ $("#goTranscribe").onclick = () => {
   if (!worker) {
     worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: "text/javascript" })), { type: "module" });
     worker.onmessage = ({ data }) => {
-      if (data.kind === "load") { if (data.p.status === "progress") { $("#tmeter").firstElementChild.style.width = Math.round(data.p.progress || 0) + "%"; $("#tstatus").textContent = `loading ${data.p.file || "the model"} … ${Math.round(data.p.progress || 0)}%`; } }
-      if (data.kind === "status") { $("#tstatus").textContent = data.msg + " (a ten-minute recording takes a few minutes; leave this tab open)"; $("#tmeter").firstElementChild.style.width = "100%"; }
+      if (data.kind === "load") { if (data.p.status === "progress") { $("#tmeter").style.width = Math.round(data.p.progress || 0) + "%"; $("#tstatus").textContent = `loading ${data.p.file || "the model"} … ${Math.round(data.p.progress || 0)}%`; } }
+      if (data.kind === "status") { $("#tstatus").textContent = data.msg + " (a ten-minute recording takes a few minutes; leave this tab open)"; $("#tmeter").style.width = "100%"; }
       if (data.kind === "error") { $("#tstatus").innerHTML = "<b style='color:var(--danger)'>" + data.msg + "</b> — reload and try the tiny model, or a shorter file."; }
       if (data.kind === "done") { gotTranscript(data.out); }
     };
