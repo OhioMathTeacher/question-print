@@ -1,8 +1,8 @@
 # Question Print — next steps
 
-Repo: `~/Repos/question-print` (public, GitHub Pages **not yet enabled**: Todd turns
-it on at Settings → Pages → branch master, folder /). Until then:
-`python3 -m http.server 8080` in the repo and open http://localhost:8080 in Firefox.
+Repo: `~/Repos/question-print` (public). Live at
+<https://ohiomathteacher.github.io/question-print/> (Pages enabled 14 Sept, branch
+master, folder /). Locally: `python3 -m http.server 8080` in the repo.
 
 ## What exists (13 Sept 2026)
 
@@ -21,15 +21,24 @@ localStorage resume.
 (math/setup label, one droppable `*.qp.json` per session, `summary.md`). Ran over the
 11 recovered Taylor sessions → `TEA-Taylor-DATA/Analysis/question-print/`.
 
-**Never tested in a real browser.** Only syntax-checked. First real run = the cold test.
+**Not yet opened by a person.** 14 Sept: loaded in headless Chromium with no
+exceptions (five steps render); the Whisper worker was not exercised, since it starts
+only on transcribe. The Firefox open and a real audio file are still the cold test.
+
+**Splitter fixed (14 Sept).** One `splitSentences` in `index.html` (both the Whisper
+and the Verbatim paths) mirrored by `split_sentences` in `tools/tag-sessions.py`:
+decimals, list markers and math (`$…$`, `\(…\)`) no longer end a sentence; a fragment
+with no letters joins the sentence before it; a run of one-word alternatives after a
+question ("Finance? Engineering?") is one question; bullet markers and emphasis come
+off. Over the 11 Taylor sessions: 291 → 272 AI questions, and the broken-math ones
+(`0001?`, `} \)?`) are gone. The `.qp.json` files in TEA-Taylor-DATA were tagged with
+the old splitter; re-run `tag-sessions.py` before the chapter quotes those counts.
 
 ## Next
 
-1. Enable Pages; open it in Firefox; drop a short audio file; watch the Whisper worker
+1. Open the live page in Firefox; drop a short audio file; watch the Whisper worker
    load and time a real 10-minute transcription on a student-class laptop.
-2. Fix whatever that breaks (likely: worker/CDN loading, timestamps on long chunks,
-   the sentence splitter over-counting list fragments as questions — seen in the
-   Taylor run: ~27 of 61 DOK-1 "questions" were fragments like "Degree?").
+2. Fix whatever that breaks (likely: worker/CDN loading, timestamps on long chunks).
 3. Cold test by a human (Todd or the GA) before any 318P student sees it.
 4. 318P home: an **option** in the Week 6 Concept Profile (one of the 2–3 pieces may
    be a transcript of the student working with a focus student, recorded on their own

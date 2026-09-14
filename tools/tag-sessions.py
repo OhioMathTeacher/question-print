@@ -24,6 +24,37 @@ CRM = {
 }
 CLAUDE = os.environ.get("CLAUDE_CODE_EXECPATH") or "claude"
 SENT = re.compile(r"[^.?!]+[.?!]+[\"')\]]?|[^.?!]+$")
+MATH = re.compile(r"\$\$.*?\$\$|\$[^$\n]+\$|\\\(.*?\\\)|\\\[.*?\\\]", re.S)
+
+
+def split_sentences(text):
+    """Same rule as splitSentences in index.html: decimals, list markers and math do not end a
+    sentence; a fragment with no letters joins the sentence before it; a run of one- or two-word
+    alternatives after a question is one question. Bullet markers and emphasis come off."""
+    keep = []
+    def mask(m):
+        keep.append(m.group(0)); return f"\x00{len(keep)-1}\x00"
+    masked = MATH.sub(mask, text)
+    masked = re.sub(r"(\d)\.(?=\d)", "\\1\x01", masked)
+    masked = re.sub(r"^(\s*(?:\d+|[a-z]))\.(?=\s)", "\\1\x01", masked, count=1, flags=re.I)
+    parts = []
+    for raw in SENT.findall(masked) or [masked]:
+        p = raw.replace("\x01", ".")
+        p = re.sub(r"\x00(\d+)\x00", lambda m: keep[int(m.group(1))], p).strip()
+        p = re.sub(r"^(?:[*\-•·]\s+)+", "", p)
+        p = re.sub(r"^\*+|\*+$", "", p).strip()
+        if not p:
+            continue
+        prev = parts[-1] if parts else None
+        words = len(re.findall(r"[^\W\d_][^\W\d_'’]*", p))
+        no_letters = not re.search(r"[^\W\d_]", p)
+        short_alt = p.endswith("?") and prev is not None and prev.endswith("?") and (
+            words <= 1 or words == 2 and not re.match(r"(what|why|how|which|where|when|who)\b", p, re.I))
+        if prev is not None and (no_letters or short_alt):
+            parts[-1] = prev + " " + p
+        else:
+            parts.append(p)
+    return parts
 
 
 def lines_from(j):
@@ -35,8 +66,7 @@ def lines_from(j):
             continue
         who = "T" if t.get("role") in ("ai", "assistant", "T") else "S"
         for par in re.split(r"\n+", text):
-            for p in SENT.findall(par) or [par]:
-                q = p.strip()
+            for q in split_sentences(par):
                 if q:
                     out.append({"t0": 0, "t1": 0, "text": q, "who": who, "q": who == "T" and bool(re.search(r"\?\s*$", q)) and len(q) < 400,
                                 "dok": 0, "bloom": 0, "ai": None, "turn": t.get("i")})
